@@ -56,7 +56,7 @@ interface for all EEG models and can derive variable names when needed.
 
     ::
 
-        pip install braindecode[hug]
+        pip install braindecode[hub]
 
     **Available pre-trained models:**
 

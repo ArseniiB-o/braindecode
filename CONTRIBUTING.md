@@ -1,6 +1,18 @@
 # Contribution Guide
 
-Todo: In case of questions, discord? At least for sprint time?
+Thanks for your interest in contributing to Braindecode! This guide walks you
+through the development setup, the contribution workflow, and the conventions
+we follow.
+
+## Questions and Support
+
+- **Bug reports and feature requests**: open a GitHub issue at
+  https://github.com/braindecode/braindecode/issues. Please search existing
+  issues first to avoid duplicates.
+- **Usage questions and general discussion**: use GitHub Discussions at
+  https://github.com/braindecode/braindecode/discussions.
+- **Security-sensitive issues**: contact the maintainers privately rather than
+  opening a public issue.
 
 For this contribution guide, we assume you are working in some Unix-environment like Ubuntu.
 

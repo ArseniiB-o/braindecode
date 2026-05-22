@@ -41,12 +41,37 @@ Requirements
 Bug fixes
 ==========
 
-- None yet
+- Fix install-extra typo ``braindecode[hug]`` → ``braindecode[hub]`` in the
+  API reference (``docs/api.rst``) and in the Hugging Face Hub usage notes of
+  :class:`braindecode.models.BIOT`, :class:`braindecode.models.BENDR`,
+  :class:`braindecode.models.CBraMod`, :class:`braindecode.models.EEGPT`,
+  :class:`braindecode.models.Labram`, :class:`braindecode.models.LUNA`, and
+  :class:`braindecode.models.REVE`. The package extra has always been spelled
+  ``hub`` in ``pyproject.toml``; ``[hug]`` resolved to no extra and silently
+  skipped installing ``huggingface_hub``.
 
 Code health
 ============
 
-- None yet
+- Re-enable Python 3.11 in the ``tests`` GitHub Actions matrix.
+  ``pyproject.toml`` declares ``requires-python = ">=3.11"``, so 3.11 must be
+  exercised in CI; previously the matrix only ran 3.12 and 3.13, which also
+  silently disabled the Codecov upload step (gated on
+  ``matrix.python-version == '3.11'``).
+- Update PyPI classifiers: graduate ``Development Status`` from
+  ``3 - Alpha`` to ``5 - Production/Stable`` (the project has been on PyPI
+  since 2017 and ships a stable 1.x line), drop the unrelated
+  ``Topic :: Software Development :: Build Tools`` classifier, and add
+  ``Topic :: Scientific/Engineering :: Bio-Informatics`` and
+  ``Topic :: Scientific/Engineering :: Medical Science Apps.``, plus
+  ``Intended Audience :: Healthcare Industry``,
+  ``License :: OSI Approved :: BSD License``, and
+  ``Operating System :: OS Independent``.
+- Replace the placeholder ``Todo: In case of questions, discord?`` opening
+  line of ``CONTRIBUTING.md`` with a "Questions and Support" section
+  pointing newcomers to GitHub Issues and Discussions.
+- Add a top-level ``ROADMAP.md`` describing the prioritized improvement plan
+  for the 1.6 / 1.7 development cycles.
 
 
 Current 1.5.1 (stable)
