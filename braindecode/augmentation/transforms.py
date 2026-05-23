@@ -118,15 +118,21 @@ class FTSurrogate(Transform):
         random_state=None,
     ):
         super().__init__(probability=probability, random_state=random_state)
-        assert isinstance(phase_noise_magnitude, (float, int, torch.Tensor)), (
-            "phase_noise_magnitude should be a float."
-        )
-        assert 0 <= phase_noise_magnitude <= 1, (
-            "phase_noise_magnitude should be between 0 and 1."
-        )
-        assert isinstance(channel_indep, bool), (
-            "channel_indep is expected to be a boolean"
-        )
+        if not isinstance(phase_noise_magnitude, (float, int, torch.Tensor)):
+            raise TypeError(
+                "phase_noise_magnitude must be a float, int or torch.Tensor; "
+                f"got {type(phase_noise_magnitude).__name__}."
+            )
+        if not (0 <= phase_noise_magnitude <= 1):
+            raise ValueError(
+                "phase_noise_magnitude must be in [0, 1]; "
+                f"got {phase_noise_magnitude}."
+            )
+        if not isinstance(channel_indep, bool):
+            raise TypeError(
+                "channel_indep must be a bool; "
+                f"got {type(channel_indep).__name__}."
+            )
         self.phase_noise_magnitude = phase_noise_magnitude
         self.channel_indep = channel_indep
 
@@ -369,9 +375,14 @@ class ChannelsSymmetry(Transform):
             probability=probability,
             random_state=random_state,
         )
-        assert isinstance(ordered_ch_names, list) and all(
-            isinstance(ch, str) for ch in ordered_ch_names
-        ), "ordered_ch_names should be a list of str."
+        if not (
+            isinstance(ordered_ch_names, list)
+            and all(isinstance(ch, str) for ch in ordered_ch_names)
+        ):
+            raise TypeError(
+                "ordered_ch_names must be a list of str; got "
+                f"{type(ordered_ch_names).__name__}."
+            )
 
         permutation = list()
         for idx, ch_name in enumerate(ordered_ch_names):
@@ -447,9 +458,14 @@ class SmoothTimeMask(Transform):
             random_state=random_state,
         )
 
-        assert (
-            isinstance(mask_len_samples, (int, torch.Tensor)) and mask_len_samples > 0
-        ), "mask_len_samples has to be a positive integer"
+        if not (
+            isinstance(mask_len_samples, (int, torch.Tensor))
+            and mask_len_samples > 0
+        ):
+            raise ValueError(
+                "mask_len_samples must be a positive integer (or 0-d tensor); "
+                f"got {mask_len_samples!r}."
+            )
         self.mask_len_samples = mask_len_samples
 
     def get_augmentation_params(self, *batch):
@@ -541,15 +557,17 @@ class BandstopFilter(Transform):
             probability=probability,
             random_state=random_state,
         )
-        assert isinstance(bandwidth, Real) and bandwidth >= 0, (
-            "bandwidth should be a non-negative float."
-        )
-        assert isinstance(sfreq, Real) and sfreq > 0, (
-            "sfreq should be a positive float."
-        )
-        if max_freq is not None:
-            assert isinstance(max_freq, Real) and max_freq > 0, (
-                "max_freq should be a positive float."
+        if not (isinstance(bandwidth, Real) and bandwidth >= 0):
+            raise ValueError(
+                f"bandwidth must be a non-negative real number; got {bandwidth!r}."
+            )
+        if not (isinstance(sfreq, Real) and sfreq > 0):
+            raise ValueError(
+                f"sfreq must be a positive real number; got {sfreq!r}."
+            )
+        if max_freq is not None and not (isinstance(max_freq, Real) and max_freq > 0):
+            raise ValueError(
+                f"max_freq must be a positive real number; got {max_freq!r}."
             )
         nyq = sfreq / 2
         if max_freq is None or max_freq > nyq:
@@ -559,10 +577,12 @@ class BandstopFilter(Transform):
                 f" Nyquist frequency ({nyq} Hz)."
                 f" Falling back to max_freq = {nyq}."
             )
-        assert bandwidth < max_freq - 2, (
-            f"`bandwidth` needs to be smaller than max_freq - 2={max_freq - 2} "
-            f"to allow valid notch frequency sampling with 1 Hz transition bands."
-        )
+        if not (bandwidth < max_freq - 2):
+            raise ValueError(
+                f"bandwidth must be smaller than max_freq - 2 = {max_freq - 2} "
+                "to allow valid notch frequency sampling with 1 Hz transition "
+                f"bands; got bandwidth={bandwidth}, max_freq={max_freq}."
+            )
 
         # override bandwidth value when a magnitude is passed
         self.sfreq = sfreq
@@ -640,9 +660,10 @@ class FrequencyShift(Transform):
             probability=probability,
             random_state=random_state,
         )
-        assert isinstance(sfreq, Real) and sfreq > 0, (
-            "sfreq should be a positive float."
-        )
+        if not (isinstance(sfreq, Real) and sfreq > 0):
+            raise ValueError(
+                f"sfreq must be a positive real number; got {sfreq!r}."
+            )
         self.sfreq = sfreq
 
         self.max_delta_freq = max_delta_freq
@@ -698,9 +719,11 @@ def _get_standard_10_20_positions(raw_or_epoch=None, ordered_ch_names=None):
         matrices that will be fed to `SensorsRotation` transform. By
         default None.
     """
-    assert raw_or_epoch is not None or ordered_ch_names is not None, (
-        "At least one of raw_or_epoch and ordered_ch_names is needed."
-    )
+    if raw_or_epoch is None and ordered_ch_names is None:
+        raise ValueError(
+            "At least one of ``raw_or_epoch`` and ``ordered_ch_names`` must "
+            "be provided."
+        )
     if ordered_ch_names is None:
         ordered_ch_names = raw_or_epoch.info["ch_names"]
     ten_twenty_montage = make_standard_montage("standard_1020")
@@ -767,23 +790,31 @@ class SensorsRotation(Transform):
         super().__init__(probability=probability, random_state=random_state)
         if isinstance(sensors_positions_matrix, (np.ndarray, list)):
             sensors_positions_matrix = torch.as_tensor(sensors_positions_matrix)
-        assert isinstance(sensors_positions_matrix, torch.Tensor), (
-            "sensors_positions should be an Tensor"
-        )
-        assert isinstance(max_degrees, (Real, torch.Tensor)) and max_degrees >= 0, (
-            "max_degrees should be non-negative float."
-        )
-        assert isinstance(axis, str) and axis in [
-            "x",
-            "y",
-            "z",
-        ], "axis can be either x, y or z."
-        assert sensors_positions_matrix.shape[0] == 3, (
-            "sensors_positions_matrix shape should be 3 x n_channels."
-        )
-        assert isinstance(spherical_splines, bool), (
-            "spherical_splines should be a boolean"
-        )
+        if not isinstance(sensors_positions_matrix, torch.Tensor):
+            raise TypeError(
+                "sensors_positions_matrix must be a torch.Tensor, ndarray or "
+                f"list; got {type(sensors_positions_matrix).__name__}."
+            )
+        if not (
+            isinstance(max_degrees, (Real, torch.Tensor)) and max_degrees >= 0
+        ):
+            raise ValueError(
+                f"max_degrees must be a non-negative real number; got {max_degrees!r}."
+            )
+        if not (isinstance(axis, str) and axis in ("x", "y", "z")):
+            raise ValueError(
+                f"axis must be one of 'x', 'y', 'z'; got {axis!r}."
+            )
+        if sensors_positions_matrix.shape[0] != 3:
+            raise ValueError(
+                "sensors_positions_matrix must have shape (3, n_channels); "
+                f"got shape {tuple(sensors_positions_matrix.shape)}."
+            )
+        if not isinstance(spherical_splines, bool):
+            raise TypeError(
+                "spherical_splines must be a bool; "
+                f"got {type(spherical_splines).__name__}."
+            )
         self.sensors_positions_matrix = sensors_positions_matrix
         self.axis = axis
         self.spherical_splines = spherical_splines
@@ -1241,12 +1272,18 @@ class MaskEncoding(Transform):
             probability=probability,
             random_state=random_state,
         )
-        assert isinstance(n_segments, int) and n_segments > 0, (
-            "n_segments should be a positive integer."
-        )
-        assert isinstance(max_mask_ratio, (int, float)) and 0 <= max_mask_ratio <= 1, (
-            "mask_ratio should be a float between 0 and 1."
-        )
+        if not (isinstance(n_segments, int) and n_segments > 0):
+            raise ValueError(
+                f"n_segments must be a positive integer; got {n_segments!r}."
+            )
+        if not (
+            isinstance(max_mask_ratio, (int, float))
+            and 0 <= max_mask_ratio <= 1
+        ):
+            raise ValueError(
+                "max_mask_ratio must be a number in [0, 1]; "
+                f"got {max_mask_ratio!r}."
+            )
 
         self.mask_ratio = max_mask_ratio
         self.n_segments = n_segments
