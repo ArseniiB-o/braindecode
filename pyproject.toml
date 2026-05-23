@@ -59,7 +59,9 @@ dependencies = [
     'torchinfo',
     'pandas',
     'wfdb>=4.3.1',  # requests comes transitively via mne→pooch and wfdb
-    'linear_attention_transformer',
+    # NOTE: ``linear_attention_transformer`` moved to the optional ``[biot]``
+    # extra — it is only required by ``models.biot.BIOT`` and friends. See
+    # ``braindecode/models/biot.py::_import_linear_attention_transformer``.
     'docstring_inheritance',        # we get einops from here
     'rotary_embedding_torch',
     'pydantic>=2.0',
@@ -83,9 +85,12 @@ moabb = ["moabb>=1.4.3"]
 eegprep = ["eegprep[eeglabio]>=0.2.23"]
 hub = ["huggingface_hub[torch]>=0.20.0", "zarr>=3.0"]
 viz = ["captum>=0.7.0"]
+# Models with linear-attention transformer backbones (BIOT, InterpolatedBIOT).
+biot = ["linear_attention_transformer"]
 tests = [
     'pytest',
     'pytest-cov',
+    'pytest-xdist',           # parallel test execution (``pytest -n auto``)
     'codecov',
     'pytest_cases',
     'mypy',
@@ -129,6 +134,7 @@ all = [
     "braindecode[eegprep]",
     "braindecode[typing]",
     "braindecode[viz]",
+    "braindecode[biot]",
 ]
 
 [tool.setuptools]
@@ -152,7 +158,10 @@ namespaces = false # to disable scanning PEP 420 namespaces (true by default)
 braindecode = ["py.typed"]
 
 [tool.ruff]
-lint.ignore-init-module-imports = true
+# ``lint.ignore-init-module-imports`` was removed: ruff now handles
+# ``__init__.py`` re-exports correctly and the flag emits a deprecation
+# warning on every run. Re-exports that should not trip ``F401`` are
+# instead expressed via ``__all__`` in each ``__init__.py``.
 line-length = 88
 target-version = "py311"
 

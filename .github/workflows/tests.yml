@@ -28,14 +28,14 @@ jobs:
     # the test configuration changes.
     - name: Create/Restore MNE Data Cache
       id: cache-mne_data
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/mne_data
         key: test-2-${{ runner.os }}-${{ matrix.python-version }}
         restore-keys: |
           test-2-${{ runner.os }}-${{ matrix.python-version }}-
           test-2-${{ runner.os }}-
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install uv
@@ -52,10 +52,14 @@ jobs:
     - run: python -c "import braindecode; print(braindecode.__version__)"
 
     ## Run Tests
-    - name: Run Tests # See https://stackoverflow.com/a/59959080/1469195 for the cov-report logic
+    # ``-n auto`` distributes the suite across all available CPUs via
+    # ``pytest-xdist``. The Codecov collector requires --cov to write a single
+    # combined XML; pytest-xdist + pytest-cov handle that automatically.
+    # See https://stackoverflow.com/a/59959080/1469195 for the cov-report logic.
+    - name: Run Tests
       env:
         HF_TOKEN_REVE: ${{ secrets.HF_TOKEN_REVE }}
-      run: pytest --cov=braindecode test/ --cov-report term --cov-report xml:coverage.xml
+      run: pytest -n auto --dist=loadscope --cov=braindecode test/ --cov-report term --cov-report xml:coverage.xml
     # Coverage is uploaded once per CI run from the lowest supported Python on
     # Ubuntu. Keep this guard in sync with the python-version matrix above —
     # historically the guard pinned a version (3.11) that was no longer in the
