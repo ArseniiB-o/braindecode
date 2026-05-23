@@ -56,9 +56,13 @@ jobs:
       env:
         HF_TOKEN_REVE: ${{ secrets.HF_TOKEN_REVE }}
       run: pytest --cov=braindecode test/ --cov-report term --cov-report xml:coverage.xml
+    # Coverage is uploaded once per CI run from the lowest supported Python on
+    # Ubuntu. Keep this guard in sync with the python-version matrix above —
+    # historically the guard pinned a version (3.11) that was no longer in the
+    # matrix, which silently disabled all coverage uploads.
     - name: Upload Coverage to Codecov
       uses: codecov/codecov-action@v4
-      if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'}}
+      if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12' }}
       with:
         fail_ci_if_error: true
         file: ./coverage.xml
