@@ -8,7 +8,10 @@ parameters:
 jobs:
     fetch_docs_from_github:
       docker:
-        - image: circleci/python:3.9
+        # ``circleci/python`` images were retired and Python 3.9 reached EOL in
+        # October 2025. Match the project's supported Python floor (>=3.11) and
+        # use the maintained ``cimg/python`` namespace.
+        - image: cimg/python:3.11
       environment:
         GITHUB_ARTIFACT_URL: << pipeline.parameters.github-artifact-url >>
       steps:
