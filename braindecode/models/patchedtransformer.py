@@ -296,7 +296,10 @@ class PBT(EEGModuleMixin, nn.Module):
         tokens = self.patching_projection(X)
 
         cls_token = self.cls_token.expand(X.size(0), 1, -1)
-        cls_idx = torch.zeros((X.size(0), 1), dtype=torch.long, device=X.device)
+        # Note: a previous version also built a ``cls_idx`` tensor of zeros
+        # here, but it was never consumed downstream — ``pos_embedding`` only
+        # receives the patch positions in ``int_pos``. Removing it avoids an
+        # unused allocation in the forward pass.
 
         tokens = torch.cat([cls_token, tokens], dim=1)
         pos_emb = self.pos_embedding(int_pos)
