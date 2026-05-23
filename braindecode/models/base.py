@@ -9,13 +9,18 @@ import json
 import warnings
 from collections import OrderedDict
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Type, Union
 
 import numpy as np
 import torch
 from docstring_inheritance import NumpyDocstringInheritanceInitMeta
 from mne.utils import _soft_import
 from torchinfo import ModelStatistics, summary
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from torch.nn.modules.module import _IncompatibleKeys
 
 from braindecode.models.util import (
     _EEG_PARAMS,
@@ -480,7 +485,7 @@ class EEGModuleMixin(_BaseHubMixin, metaclass=_BraindecodeDocstringMeta):
         resolve_type_kwargs(cls, config)
         return cls(**config)
 
-    def reset_head(self, n_outputs):
+    def reset_head(self, n_outputs: int) -> None:
         """Replace the classification head for a new number of outputs.
 
         This is called automatically by :meth:`from_pretrained` when the
@@ -510,7 +515,12 @@ class EEGModuleMixin(_BaseHubMixin, metaclass=_BraindecodeDocstringMeta):
 
     mapping: Optional[Dict[str, str]] = None
 
-    def load_state_dict(self, state_dict, *args, **kwargs):
+    def load_state_dict(
+        self,
+        state_dict: "Mapping[str, torch.Tensor]",
+        *args: Any,
+        **kwargs: Any,
+    ) -> "_IncompatibleKeys":
         mapping = self.mapping if self.mapping else {}
         new_state_dict = OrderedDict()
         for k, v in state_dict.items():

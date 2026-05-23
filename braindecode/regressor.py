@@ -6,7 +6,10 @@
 #
 # License: BSD (3-clause)
 
+from __future__ import annotations
+
 import warnings
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from skorch.regressor import NeuralNetRegressor
@@ -14,6 +17,9 @@ from skorch.regressor import NeuralNetRegressor
 from .eegneuralnet import _EEGNeuralNet
 from .training.scoring import predict_trials
 from .util import ThrowAwayIndexLoader, update_estimator_docstring
+
+if TYPE_CHECKING:
+    from .datasets import BaseConcatDataset
 
 
 class EEGRegressor(_EEGNeuralNet, NeuralNetRegressor):
@@ -81,14 +87,19 @@ class EEGRegressor(_EEGNeuralNet, NeuralNetRegressor):
             **kwargs,
         )
 
-    def get_iterator(self, dataset, training=False, drop_index=True):
+    def get_iterator(
+        self,
+        dataset: Any,
+        training: bool = False,
+        drop_index: bool = True,
+    ) -> Any:
         iterator = super().get_iterator(dataset, training=training)
         if drop_index:
             return ThrowAwayIndexLoader(self, iterator, is_regression=True)
         else:
             return iterator
 
-    def predict_proba(self, X):
+    def predict_proba(self, X: Any) -> np.ndarray:
         """Return the output of the module's forward method as a numpy.
 
         array. In case of cropped decoding returns averaged values for
@@ -138,7 +149,11 @@ class EEGRegressor(_EEGNeuralNet, NeuralNetRegressor):
         else:
             return y_pred
 
-    def predict_trials(self, X, return_targets=True):
+    def predict_trials(
+        self,
+        X: "BaseConcatDataset",
+        return_targets: bool = True,
+    ) -> Any:
         """Create trialwise predictions and optionally also return trialwise.
 
         labels from cropped dataset.
@@ -180,7 +195,7 @@ class EEGRegressor(_EEGNeuralNet, NeuralNetRegressor):
             num_workers=self.get_iterator(X, training=False).loader.num_workers,
         )
 
-    def fit(self, X, y=None, **kwargs):
+    def fit(self, X: Any, y: Any = None, **kwargs: Any) -> Any:
         """Initialize and fit the module.
 
         If the module was already initialized, by calling fit, the
@@ -230,5 +245,5 @@ class EEGRegressor(_EEGNeuralNet, NeuralNetRegressor):
         super().fit(X=X, y=y, **kwargs)
 
     @property
-    def mode(self):
+    def mode(self) -> str:
         return "regression"

@@ -6,7 +6,10 @@
 #
 # License: BSD (3-clause)
 
+from __future__ import annotations
+
 import warnings
+from typing import TYPE_CHECKING, Any
 
 from skorch import NeuralNet
 from skorch.callbacks import EpochScoring
@@ -16,6 +19,11 @@ from torch.nn import CrossEntropyLoss
 from .eegneuralnet import _EEGNeuralNet
 from .training.scoring import predict_trials
 from .util import ThrowAwayIndexLoader, update_estimator_docstring
+
+if TYPE_CHECKING:
+    import numpy as np
+
+    from .datasets import BaseConcatDataset
 
 
 class EEGClassifier(_EEGNeuralNet, NeuralNetClassifier):
@@ -86,14 +94,19 @@ class EEGClassifier(_EEGNeuralNet, NeuralNetClassifier):
             **kwargs,
         )
 
-    def get_iterator(self, dataset, training=False, drop_index=True):
+    def get_iterator(
+        self,
+        dataset: Any,
+        training: bool = False,
+        drop_index: bool = True,
+    ) -> Any:
         iterator = super().get_iterator(dataset, training=training)
         if drop_index:
             return ThrowAwayIndexLoader(self, iterator, is_regression=False)
         else:
             return iterator
 
-    def predict_proba(self, X):
+    def predict_proba(self, X: Any) -> "np.ndarray":
         """Return the output of the module's forward method as a numpy.
 
         array. In case of cropped decoding returns averaged values for
@@ -169,7 +182,7 @@ class EEGClassifier(_EEGNeuralNet, NeuralNetClassifier):
         """
         return NeuralNet.get_loss(self, y_pred, y_true, *args, **kwargs)
 
-    def predict(self, X):
+    def predict(self, X: Any) -> "np.ndarray":
         """Return class labels for samples in X.
 
         Parameters
@@ -194,7 +207,11 @@ class EEGClassifier(_EEGNeuralNet, NeuralNetClassifier):
         """
         return self.predict_proba(X).argmax(1)
 
-    def predict_trials(self, X, return_targets=True):
+    def predict_trials(
+        self,
+        X: "BaseConcatDataset",
+        return_targets: bool = True,
+    ) -> Any:
         """Create trialwise predictions and optionally also return trialwise.
 
         labels from cropped dataset.
@@ -237,7 +254,7 @@ class EEGClassifier(_EEGNeuralNet, NeuralNetClassifier):
         )
 
     @property
-    def mode(self):
+    def mode(self) -> str:
         return "classification"
 
     # Only add the 'accuracy' callback if we are not in cropped mode.
