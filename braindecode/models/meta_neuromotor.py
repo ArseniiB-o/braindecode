@@ -290,12 +290,15 @@ class MetaNeuromotorHand(EEGModuleMixin, nn.Module):
     Examples
     --------
     Load Meta's pretrained handwriting checkpoint (`download script`_
-    in the upstream repo)::
+    in the upstream repo). Use ``weights_only=True`` whenever the file
+    can be trusted to contain only tensors — this is the safe default
+    recommended since PyTorch 2.4 and avoids arbitrary code execution
+    on a malicious checkpoint::
 
         import torch
         from braindecode.models import MetaNeuromotorHand
 
-        ckpt = torch.load("model_checkpoint.ckpt", weights_only=False)
+        ckpt = torch.load("model_checkpoint.ckpt", weights_only=True)
         sd = {
             k[len("network."):]: v
             for k, v in ckpt["state_dict"].items()
