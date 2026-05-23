@@ -1,0 +1,75 @@
+version: 2
+
+# Dependabot keeps the project's tooling dependencies fresh. Application
+# dependencies (torch, mne, etc.) are intentionally NOT version-pinned in
+# ``pyproject.toml`` because braindecode lives downstream of a fast-moving
+# scientific stack, so the only PRs we want here are for:
+#
+#   * GitHub Actions used in the workflows under ``.github/workflows``;
+#   * the small set of pip-installable build/dev tools (pre-commit, ruff,
+#     mypy) that ARE pinned in ``pyproject.toml`` and ``.pre-commit-config.yaml``.
+#
+# pre-commit hook revisions are kept up to date by ``pre-commit.ci``
+# (configured in ``.pre-commit-config.yaml``) on a quarterly cadence, so
+# we don't duplicate that work here.
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "ci"
+      - "dependencies"
+    commit-message:
+      prefix: "[CI]"
+      include: "scope"
+    groups:
+      # Batch routine action bumps into a single PR per week to avoid
+      # PR noise. Major version bumps stay on their own so they can be
+      # reviewed individually.
+      gh-actions-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "[MNT]"
+      include: "scope"
+    # Only watch the dev/tooling extras. Runtime dependencies are
+    # already constrained by version floors in ``pyproject.toml`` and
+    # are intentionally left unpinned otherwise.
+    allow:
+      - dependency-type: "direct"
+    ignore:
+      # Scientific stack — let users / upstream control these.
+      - dependency-name: "torch"
+      - dependency-name: "torchaudio"
+      - dependency-name: "mne"
+      - dependency-name: "mne_bids"
+      - dependency-name: "numpy"
+      - dependency-name: "scipy"
+      - dependency-name: "pandas"
+      - dependency-name: "scikit-learn"
+      - dependency-name: "skorch"
+      - dependency-name: "h5py"
+      - dependency-name: "wfdb"
+      - dependency-name: "moabb"
+      - dependency-name: "huggingface_hub"
+      - dependency-name: "transformers"
+      - dependency-name: "captum"
+      - dependency-name: "lightning"
