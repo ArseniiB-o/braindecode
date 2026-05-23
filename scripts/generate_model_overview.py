@@ -164,7 +164,10 @@ def main() -> int:
     if args.output:
         args.output.write_text(text, encoding="utf-8")
     else:
-        sys.stdout.write(text)
+        # Force UTF-8 on stdout even when the host console default is
+        # something restrictive like cp1251 on Windows — the table
+        # contains "—" and other non-ASCII glyphs.
+        sys.stdout.buffer.write(text.encode("utf-8"))
     return 0
 
 
