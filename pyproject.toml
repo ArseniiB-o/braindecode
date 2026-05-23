@@ -32,15 +32,19 @@ keywords = [
     "electroencephalogram",
 ]
 classifiers = [
-    'Development Status :: 3 - Alpha',
-    "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-    'Topic :: Software Development :: Build Tools',
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    'Development Status :: 5 - Production/Stable',
+    'Intended Audience :: Developers',
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: BSD License',
+    'Operating System :: OS Independent',
+    'Topic :: Scientific/Engineering :: Artificial Intelligence',
+    'Topic :: Scientific/Engineering :: Medical Science Apps.',
+    'Programming Language :: Python :: 3',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
     'Programming Language :: Python :: 3.14',
+    'Typing :: Typed',
 ]
 readme = "README.rst"
 requires-python = ">=3.11"
@@ -141,6 +145,12 @@ include = [
 exclude = [] # exclude packages matching these glob patterns (empty by default)
 namespaces = false # to disable scanning PEP 420 namespaces (true by default)
 
+# Ship the PEP 561 ``py.typed`` marker so downstream projects pick up our
+# type hints. Without this, ``mypy`` / Pyright in user code silently treats
+# braindecode as untyped even though we ship inline annotations.
+[tool.setuptools.package-data]
+braindecode = ["py.typed"]
+
 [tool.ruff]
 lint.ignore-init-module-imports = true
 line-length = 88
@@ -162,3 +172,55 @@ testpaths = ["test"]
 python_files = ["test_*.py", "*_test.py"]
 # which functions inside them count as tests
 python_functions = ["test_*"]
+
+# ---------------------------------------------------------------------------
+# Type checking
+# ---------------------------------------------------------------------------
+# Baseline mypy config. Strictness is intentionally low so that the project's
+# 33%-typed surface compiles cleanly today, while still catching the worst
+# regressions (untyped attribute access, redefinitions, import cycles).
+# Modules can be tightened individually via additional ``[[tool.mypy.overrides]]``
+# blocks as type coverage grows toward the 80% goal tracked in the roadmap.
+[tool.mypy]
+python_version = "3.11"
+files = ["braindecode"]
+ignore_missing_imports = true        # MNE / wfdb / skorch ship partial stubs
+follow_imports = "silent"
+warn_redundant_casts = true
+warn_unused_ignores = false          # set to true once existing ignores cleaned
+no_implicit_optional = true
+check_untyped_defs = false           # baseline only — flip per-module below
+disable_error_code = ["import-untyped"]
+
+# Strictly typed modules. Add new entries here as files get cleaned up.
+[[tool.mypy.overrides]]
+module = [
+    "braindecode.version",
+]
+check_untyped_defs = true
+disallow_untyped_defs = true
+
+# Third-party libraries without type stubs we want to keep quiet about.
+[[tool.mypy.overrides]]
+module = [
+    "mne.*",
+    "mne_bids.*",
+    "skorch.*",
+    "wfdb.*",
+    "torchinfo.*",
+    "rotary_embedding_torch.*",
+    "linear_attention_transformer.*",
+    "docstring_inheritance.*",
+    "h5py.*",
+    "joblib.*",
+    "pandas.*",
+    "scipy.*",
+    "sklearn.*",
+    "matplotlib.*",
+    "moabb.*",
+    "huggingface_hub.*",
+    "zarr.*",
+    "captum.*",
+    "eegprep.*",
+]
+ignore_missing_imports = true
