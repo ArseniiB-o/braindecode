@@ -1207,17 +1207,30 @@ def _check_windowing_arguments(
             return True
         return _is_int_or_none(v, allow_none=allow_none)
 
-    assert _is_int_or_dict(trial_start_offset_samples), (
-        "trial_start_offset_samples must be an int or a dict[str, int]"
-    )
-    assert _is_int_or_dict(trial_stop_offset_samples, allow_none=True), (
-        "trial_stop_offset_samples must be an int, None, or a dict[str, int]"
-    )
-    assert isinstance(window_size_samples, (int, np.integer, type(None)))
+    # NOTE: these were ``assert`` statements but Python's ``-O`` flag strips
+    # them, which silently disables all input validation in optimised
+    # deployments. Convert to ``raise`` so the invariants always hold.
+    if not _is_int_or_dict(trial_start_offset_samples):
+        raise TypeError(
+            "trial_start_offset_samples must be an int or a dict[str, int]; "
+            f"got {type(trial_start_offset_samples).__name__}."
+        )
+    if not _is_int_or_dict(trial_stop_offset_samples, allow_none=True):
+        raise TypeError(
+            "trial_stop_offset_samples must be an int, None, or a "
+            f"dict[str, int]; got {type(trial_stop_offset_samples).__name__}."
+        )
+    if not isinstance(window_size_samples, (int, np.integer, type(None))):
+        raise TypeError(
+            "window_size_samples must be an int or None; "
+            f"got {type(window_size_samples).__name__}."
+        )
 
-    assert _is_int_or_dict(window_stride_samples, allow_none=True), (
-        "window_stride_samples must be an int, None, or a dict[str, int]"
-    )
+    if not _is_int_or_dict(window_stride_samples, allow_none=True):
+        raise TypeError(
+            "window_stride_samples must be an int, None, or a dict[str, int]; "
+            f"got {type(window_stride_samples).__name__}."
+        )
 
     # When stride is a dict, window_size_samples must be provided
     stride_is_none = (
@@ -1225,18 +1238,33 @@ def _check_windowing_arguments(
         if not isinstance(window_stride_samples, dict)
         else False
     )
-    assert (window_size_samples is None) == stride_is_none, (
-        "window_size_samples and window_stride_samples must both be None or both be set"
-    )
+    if (window_size_samples is None) != stride_is_none:
+        raise ValueError(
+            "window_size_samples and window_stride_samples must both be None "
+            "or both be set, got "
+            f"window_size_samples={window_size_samples!r}, "
+            f"window_stride_samples={window_stride_samples!r}."
+        )
 
     if window_size_samples is not None:
-        assert window_size_samples > 0, "window size has to be larger than 0"
-        if isinstance(window_stride_samples, dict):
-            assert all(v > 0 for v in window_stride_samples.values()), (
-                "all window stride values have to be larger than 0"
+        if window_size_samples <= 0:
+            raise ValueError(
+                "window_size_samples must be larger than 0, "
+                f"got {window_size_samples}."
             )
+        if isinstance(window_stride_samples, dict):
+            if not all(v > 0 for v in window_stride_samples.values()):
+                bad = {k: v for k, v in window_stride_samples.items() if v <= 0}
+                raise ValueError(
+                    "All window_stride_samples values must be larger than 0, "
+                    f"got non-positive entries {bad}."
+                )
         else:
-            assert window_stride_samples > 0, "window stride has to be larger than 0"
+            if window_stride_samples <= 0:
+                raise ValueError(
+                    "window_stride_samples must be larger than 0, "
+                    f"got {window_stride_samples}."
+                )
 
 
 def _check_and_set_fixed_length_window_arguments(
@@ -1295,11 +1323,22 @@ def _check_and_set_fixed_length_window_arguments(
         # necessary for following assertion
         drop_last_window = None
 
-    assert (
+    # Defensive invariant: by the branches above the three values must agree
+    # on being None or not None. Promote from ``assert`` to ``raise`` so the
+    # check survives ``python -O``.
+    if not (
         (window_size_samples is None)
         == (window_stride_samples is None)
         == (drop_last_window is None)
-    )
+    ):
+        raise ValueError(
+            "Inconsistent windowing arguments: window_size_samples, "
+            "window_stride_samples and drop_last_window must all be None "
+            "or all be set, got "
+            f"window_size_samples={window_size_samples!r}, "
+            f"window_stride_samples={window_stride_samples!r}, "
+            f"drop_last_window={drop_last_window!r}."
+        )
     if not drop_last_window and lazy_metadata:
         raise ValueError(
             "Cannot have drop_last_window=False and lazy_metadata=True at the same time."
