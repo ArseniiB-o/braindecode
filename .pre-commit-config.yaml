@@ -62,6 +62,20 @@ repos:
             "--ignore=D100,D101,D102,D105,D107,D415,D417,D205",
           ]
         files: ^braindecode/
+      # Base pyflakes/pycodestyle rules for the library. ``E501`` (line length)
+      # is intentionally ignored because formatter and autoreformat already
+      # control wrap behaviour; ``E731`` (lambda assignment) and ``E741``
+      # (ambiguous variable names like ``l`` for time-step indices) are
+      # idiomatic in the EEG-DL code base.
+      - id: ruff
+        name: ruff lint braindecode (pyflakes/pycodestyle)
+        args:
+          [
+            "--fix",
+            "--select=E,W,F",
+            "--ignore=E501,E731,E741,F401",
+          ]
+        files: ^braindecode/
       - id: ruff
         name: ruff lint docs & examples
         args:
