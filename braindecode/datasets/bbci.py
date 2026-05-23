@@ -100,12 +100,13 @@ class BBCIDataset(object):
                 lambda s: not s.startswith("GSR"), eeg_sensor_names
             )
             eeg_sensor_names = list(eeg_sensor_names)
-            assert (
-                len(eeg_sensor_names) == 128
-                or len(eeg_sensor_names) == 64
-                or len(eeg_sensor_names) == 32
-                or len(eeg_sensor_names) == 16
-            ), "Recheck this code if you have different sensors..."
+            if len(eeg_sensor_names) not in (16, 32, 64, 128):
+                raise ValueError(
+                    "Expected a standard BBCI montage with 16/32/64/128 EEG "
+                    f"sensors after filtering; got {len(eeg_sensor_names)}. "
+                    "Pass ``load_sensor_names`` explicitly if you are using "
+                    "a non-standard montage."
+                )
             wanted_sensor_names = eeg_sensor_names
         else:
             wanted_sensor_names = self.load_sensor_names
@@ -115,16 +116,28 @@ class BBCIDataset(object):
     def _determine_samplingrate(self):
         with h5py.File(self.filename, "r") as h5file:
             fs = h5file["nfo"]["fs"][0, 0]
-            assert isinstance(fs, int) or fs.is_integer()
+            if not (isinstance(fs, int) or fs.is_integer()):
+                raise ValueError(
+                    f"Expected integer sampling rate in {self.filename}; "
+                    f"got {fs!r}."
+                )
             fs = int(fs)
         return fs
 
     @staticmethod
     def _determine_chan_inds(all_sensor_names, sensor_names):
-        assert sensor_names is not None
+        if sensor_names is None:
+            raise ValueError("sensor_names must not be None.")
         chan_inds = [all_sensor_names.index(s) for s in sensor_names]
-        assert len(chan_inds) == len(sensor_names), "Allsensors should be there."
-        assert len(set(chan_inds)) == len(chan_inds), "No duplicated sensors wanted."
+        if len(chan_inds) != len(sensor_names):
+            raise ValueError(
+                "Not all requested sensors were found in all_sensor_names."
+            )
+        if len(set(chan_inds)) != len(chan_inds):
+            raise ValueError(
+                "Duplicated sensors requested. Each entry of ``sensor_names`` "
+                "must be unique."
+            )
         return chan_inds
 
     @staticmethod
@@ -677,10 +690,19 @@ def load_bbci_sets_from_folder(
     """
     bbci_mat_files = sorted(glob(os.path.join(folder, "*.BBCI.mat")))
     if runs != "all":
-        assert isinstance(runs, list), "runs should be list[int] or 'all'"
+        if not isinstance(runs, list):
+            raise TypeError(
+                "``runs`` must be a list of ints or the string 'all'; "
+                f"got {type(runs).__name__}."
+            )
         matches = [re.search("S[0-9]{3,3}R[0-9]{2,2}_", f) for f in bbci_mat_files]
         file_run_numbers = [int(m.group()[5:7]) for m in matches if m is not None]
-        assert len(file_run_numbers) == len(bbci_mat_files), "Some files don't match"
+        if len(file_run_numbers) != len(bbci_mat_files):
+            raise ValueError(
+                "Some files in the folder do not match the expected "
+                "SxxxRyy_ naming convention. Make sure every .BBCI.mat "
+                "file follows it before filtering by run."
+            )
         indices = [file_run_numbers.index(num) for num in runs]
 
         wanted_files = np.array(bbci_mat_files)[indices]
