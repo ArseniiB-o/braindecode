@@ -1228,13 +1228,21 @@ class _ConvFeatureEncoder(nn.Sequential):
         conv_bias: bool = False,
         activation: type[nn.Module] = nn.GELU,
     ):
-        assert mode in {"default", "layer_norm"}
+        if mode not in {"default", "layer_norm"}:
+            raise ValueError(
+                "mode must be one of 'default', 'layer_norm'; "
+                f"got {mode!r}."
+            )
 
         input_channels = 1
         conv_layers = []
         for i, layer_spec in enumerate(conv_layers_spec):
             # Each layer_spec should be a tuple: (output_channels, kernel_size, stride)
-            assert len(layer_spec) == 3, "Invalid conv definition: " + str(layer_spec)
+            if len(layer_spec) != 3:
+                raise ValueError(
+                    "Each entry of conv_layers_spec must be a 3-tuple of "
+                    f"(output_channels, kernel_size, stride); got {layer_spec!r}."
+                )
             output_channels, kernel_size, stride = layer_spec
             conv_layers.append(
                 self._get_block(
@@ -1276,9 +1284,11 @@ class _ConvFeatureEncoder(nn.Sequential):
         is_group_norm=False,
         conv_bias=False,
     ):
-        assert not (is_layer_norm and is_group_norm), (
-            "layer norm and group norm are exclusive"
-        )
+        if is_layer_norm and is_group_norm:
+            raise ValueError(
+                "is_layer_norm and is_group_norm are mutually exclusive; "
+                "got both set to True."
+            )
 
         conv = nn.Conv1d(
             input_channels,
@@ -1344,7 +1354,11 @@ class _ChannelEmbedding(nn.Embedding):
         self.embedding_dim_per_coordinate = embedding_dim // len(self.coordinate_ranges)
         self.channel_locations = list(channel_locations)
 
-        assert embedding_dim % len(self.coordinate_ranges) == 0
+        if embedding_dim % len(self.coordinate_ranges) != 0:
+            raise ValueError(
+                f"embedding_dim ({embedding_dim}) must be divisible by the "
+                f"number of coordinate ranges ({len(self.coordinate_ranges)})."
+            )
 
         super().__init__(len(channel_locations), embedding_dim, **kwargs)
 
@@ -1461,8 +1475,19 @@ class _PosEncoder(nn.Module):
             ch_idxs = self.default_ch_idxs[None, :].expand(batch_size, -1)
 
         batch_size_chs, n_chans = ch_idxs.shape
-        assert emb_dim >= self.spat_dim + self.time_dim
-        assert n_chans_times % n_chans == 0
+        if emb_dim < self.spat_dim + self.time_dim:
+            raise ValueError(
+                f"local_features has emb_dim={emb_dim}, which is smaller "
+                f"than spat_dim ({self.spat_dim}) + time_dim "
+                f"({self.time_dim}). Increase the encoder embedding "
+                "dimension or reduce the positional-encoding split."
+            )
+        if n_chans_times % n_chans != 0:
+            raise ValueError(
+                f"local_features has n_chans_times={n_chans_times} which is "
+                f"not divisible by n_chans={n_chans}. The two must agree so "
+                "the temporal dimension can be inferred."
+            )
         n_times = n_chans_times // n_chans
 
         pos_encoding = local_features.new_empty(
