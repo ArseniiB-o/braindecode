@@ -4,9 +4,29 @@ from warnings import warn
 import numpy as np
 import torch
 import torch.nn as nn
-from linear_attention_transformer import LinearAttentionTransformer
 
 from braindecode.models.base import EEGModuleMixin
+
+
+def _import_linear_attention_transformer():
+    """Lazy import for the optional ``linear_attention_transformer`` dep.
+
+    ``linear_attention_transformer`` is only used by BIOT and its
+    ``InterpolatedBIOT`` variant. Pulling it into ``braindecode``'s base
+    install would force every user of any other model to also install a
+    fairly heavy transformer kernel. Instead we declare it as part of the
+    ``[biot]`` / ``[all]`` extras and import on first construction of a
+    BIOT model, raising a clear error if the user has the wrong install.
+    """
+    try:
+        from linear_attention_transformer import LinearAttentionTransformer
+    except ImportError as exc:  # pragma: no cover - exercised by users without the extra
+        raise ImportError(
+            "The BIOT family of models depends on the optional "
+            "``linear_attention_transformer`` package. Install it with "
+            "``pip install braindecode[biot]`` (or ``pip install braindecode[all]``)."
+        ) from exc
+    return LinearAttentionTransformer
 
 # -----------------------------------------------------------------------------
 # Canonical channel order for InterpolatedBIOT — the 18-channel TCP bipolar
@@ -470,6 +490,7 @@ class _BIOTEncoder(nn.Module):
         self.patch_embedding = _PatchFrequencyEmbedding(
             emb_size=emb_size, n_freq=int(self.n_fft // 2 + 1)
         )
+        LinearAttentionTransformer = _import_linear_attention_transformer()
         self.transformer = LinearAttentionTransformer(
             dim=emb_size,
             heads=num_heads,
