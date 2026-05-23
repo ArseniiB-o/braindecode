@@ -28,25 +28,107 @@ Current 1.6.0 (GitHub)
 Enhancements
 ============
 
+- Add an opt-out for the unsafe binary cache used by
+  :func:`braindecode.datautil.serialization.load_concat_dataset`.
+  Setting the ``BRAINDECODE_DISABLE_PICKLE_CACHE=1`` environment
+  variable skips both reading and writing the ``.pkl`` companion
+  files and forces every load through MNE directly. Loading an
+  existing cache file now also emits a one-shot ``UserWarning``
+  per absolute path pointing the user at :ref:`SECURITY.md`. By
+  `Arsenii Boichenko`_.
+
+- Lazy-import ``linear_attention_transformer`` so it is no longer
+  pulled in by the default ``pip install braindecode``. The
+  dependency moves to a new ``[biot]`` optional-extra (also
+  included in ``[all]``); attempting to instantiate :class:`braindecode.models.BIOT`
+  without the extra raises a clear ``ImportError`` pointing at the
+  install command. By `Arsenii Boichenko`_.
+
 API and behavior changes
 ========================
 
-- None yet
+- Several input-validation ``assert`` statements have been promoted to
+  proper ``TypeError`` / ``ValueError`` / ``FileNotFoundError`` so they
+  survive ``python -O`` and ``PYTHONOPTIMIZE`` deployments. This
+  affects argument checks in
+  :func:`braindecode.preprocessing.create_windows_from_events`,
+  :func:`braindecode.preprocessing.create_fixed_length_windows`,
+  :func:`braindecode.datautil.serialization.load_concat_dataset`
+  (legacy layout), several augmentations in
+  :mod:`braindecode.augmentation`, :class:`braindecode.datasets.BBCIDataset`,
+  and :class:`braindecode.models.SignalJEPA`. Callers that previously
+  caught ``AssertionError`` should broaden to the specific exception
+  type now raised. By `Arsenii Boichenko`_.
 
 Requirements
 ============
 
-- None yet
+- ``linear_attention_transformer`` is no longer a core dependency. It
+  is now part of the optional ``[biot]`` extra; users of the BIOT
+  family of models should install ``braindecode[biot]`` (or
+  ``braindecode[all]``).
 
 Bug fixes
 ==========
 
-- None yet
+- Restore the Codecov upload step in the test workflow. The previous
+  guard pinned ``python-version == '3.11'``, but that version is no
+  longer in the test matrix, which silently disabled all coverage
+  uploads. By `Arsenii Boichenko`_.
+- Remove an unused tensor allocation in the forward pass of
+  :class:`braindecode.models.PBT` (``cls_idx`` was created but never
+  consumed downstream). By `Arsenii Boichenko`_.
 
 Code health
 ============
 
-- None yet
+- Add a non-blocking ``mypy`` job (advisory, ``continue-on-error``) and
+  a baseline ``[tool.mypy]`` configuration to ``pyproject.toml``.
+  Strictness will be ratcheted up per-module as type coverage grows
+  toward the 80 % target described in :doc:`/ROADMAP`. By
+  `Arsenii Boichenko`_.
+- Extend the ``ruff`` pre-commit selection on the ``braindecode/``
+  source tree from ``NPY201`` + ``F401`` to the broader ``E,W,F``
+  pyflakes/pycodestyle set (with idiomatic EEG-DL exceptions). By
+  `Arsenii Boichenko`_.
+- Bump deprecated CI infrastructure: ``actions/cache@v3`` → ``@v4``,
+  ``actions/setup-python@v4`` → ``@v5``, ``circleci/python:3.9`` →
+  ``cimg/python:3.11`` (3.9 is EOL since October 2025). Remove the
+  deprecated ``lint.ignore-init-module-imports`` ruff option. By
+  `Arsenii Boichenko`_.
+- Add ``.github/dependabot.yml`` watching GitHub Actions and pinned
+  pip dev tooling (the scientific stack is intentionally excluded).
+  By `Arsenii Boichenko`_.
+- Promote the PyPI ``Development Status`` classifier from ``Alpha``
+  to ``Production/Stable`` and add the missing
+  ``License :: OSI Approved :: BSD License``,
+  ``Operating System :: OS Independent``,
+  ``Topic :: Scientific/Engineering :: Medical Science Apps.`` and
+  ``Typing :: Typed`` classifiers. Ship a PEP 561 ``py.typed`` marker
+  so downstream projects pick up our inline type annotations under
+  ``mypy`` / Pyright. By `Arsenii Boichenko`_.
+- Add ``SECURITY.md`` with reporting policy and known considerations
+  (binary cache deserialization, ``torch.load`` weights-only,
+  dataset downloads). By `Arsenii Boichenko`_.
+- Add ``ROADMAP.md`` capturing the P0/P1/P2/P3 engineering plan. By
+  `Arsenii Boichenko`_.
+- Add ``scripts/generate_model_overview.py`` and the initial generated
+  ``docs/models/overview.md`` listing all 57 model classes with their
+  module path, one-line description and constructor signature. By
+  `Arsenii Boichenko`_.
+- Add ONNX + TorchScript export smoke tests for
+  :class:`braindecode.models.EEGNetv4`,
+  :class:`braindecode.models.ShallowFBCSPNet` and
+  :class:`braindecode.models.EEGConformer` to catch deployment
+  regressions early. By `Arsenii Boichenko`_.
+- Add an end-to-end :class:`braindecode.EEGClassifier` smoke test on
+  synthetic data and a unit test suite for the new safer-cache
+  opt-out. By `Arsenii Boichenko`_.
+- Update the ``MetaNeuromotorHand`` docstring example to use
+  ``weights_only=True`` when loading the upstream checkpoint, matching
+  PyTorch 2.4+ guidance. By `Arsenii Boichenko`_.
+- Switch the test runner to ``pytest -n auto --dist=loadscope`` (via
+  ``pytest-xdist``) to cut wallclock CI time. By `Arsenii Boichenko`_.
 
 
 Current 1.5.1 (stable)
@@ -1217,3 +1299,4 @@ Authors
 .. _Sarthak Tayal: https://github.com/tayal-sarthak
 .. _Vandit Shah: https://github.com/ShahVandit
 .. _Léo Burgund: https://github.com/leob000
+.. _Arsenii Boichenko: https://github.com/ArseniiB-o
