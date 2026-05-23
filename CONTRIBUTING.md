@@ -2,6 +2,25 @@
 
 Todo: In case of questions, discord? At least for sprint time?
 
+> **Quickstart (60 seconds).** If you already use `uv` and have Python ≥ 3.11
+> installed, the following gets you a working dev environment plus
+> pre-commit hooks:
+>
+> ```bash
+> git clone https://github.com/<yourusername>/braindecode.git
+> cd braindecode
+> uv venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+> uv pip install -e ".[all]"
+> pre-commit install
+> pytest -n auto test/                     # run the test suite in parallel
+> ```
+>
+> The detailed setup walkthrough below explains every step and the
+> non-`uv` (plain `pip` + `venv`) alternative; the Quickstart is the
+> happy path for first-time contributors who already have the standard
+> Python toolchain. See `ROADMAP.md` for what to work on, and
+> `SECURITY.md` if you intend to report a vulnerability.
+
 For this contribution guide, we assume you are working in some Unix-environment like Ubuntu.
 
 ## Setup Braindecode for Development
