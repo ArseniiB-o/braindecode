@@ -6,7 +6,7 @@
 
 import json
 import os
-import pickle
+import pickle  # noqa: S403 - documented unsafe surface, see SECURITY.md
 import warnings
 from glob import glob
 from pathlib import Path
@@ -21,6 +21,44 @@ from ..datasets.base import (
     RawDataset,
     WindowsDataset,
 )
+
+# Set ``BRAINDECODE_DISABLE_PICKLE_CACHE=1`` in the environment to skip the
+# binary ``.pkl`` cache that :func:`load_concat_dataset` uses to speed up
+# repeated reads of the same ``.fif`` files. The cache uses Python's binary
+# serializer and is unsafe to consume from an untrusted source — see
+# ``SECURITY.md``. Disabling it forces every read to go through
+# ``mne.io.read_raw_fif`` / ``mne.read_epochs`` instead.
+_DISABLE_CACHE_ENV_VAR = "BRAINDECODE_DISABLE_PICKLE_CACHE"
+
+# Track which cache files we already warned about so the note is emitted
+# once per file per process instead of on every batch read.
+_WARNED_PICKLE_PATHS: set[str] = set()
+
+
+def _pickle_cache_disabled() -> bool:
+    """Return True when the user explicitly disabled the binary cache."""
+    return os.environ.get(_DISABLE_CACHE_ENV_VAR, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _warn_pickle_cache_load(pkl_file: Path) -> None:
+    """Emit a one-shot security note when reading an existing cache file."""
+    key = str(pkl_file.resolve())
+    if key in _WARNED_PICKLE_PATHS:
+        return
+    _WARNED_PICKLE_PATHS.add(key)
+    warnings.warn(
+        f"Loading dataset cache from {pkl_file}. The .pkl format is not "
+        "safe to deserialize from an untrusted source. Only load caches "
+        "you produced yourself (see SECURITY.md). Set "
+        f"{_DISABLE_CACHE_ENV_VAR}=1 to disable the cache entirely.",
+        UserWarning,
+        stacklevel=2,
+    )
 
 
 def save_concat_dataset(path, concat_dataset, overwrite=False):
@@ -55,9 +93,11 @@ def _outdated_load_concat_dataset(path, preload, ids_to_load=None, target_name=N
     """
     # assume we have a single concat dataset to load
     is_raw = (path / "0-raw.fif").is_file()
-    assert not (not is_raw and target_name is not None), (
-        "Setting a new target is only supported for raws."
-    )
+    if not is_raw and target_name is not None:
+        raise ValueError(
+            "Setting a new target via ``target_name`` is only supported "
+            "for raw datasets (-raw.fif), not for epoch datasets (-epo.fif)."
+        )
     is_epochs = (path / "0-epo.fif").is_file()
     paths = [path]
     # assume we have multiple concat datasets to load
@@ -70,9 +110,11 @@ def _outdated_load_concat_dataset(path, preload, ids_to_load=None, target_name=N
             paths = [paths[i] for i in ids_to_load]
         ids_to_load = None
     # if we have neither a single nor multiple datasets, something went wrong
-    assert is_raw or is_epochs, (
-        f"Expect either raw or epo to exist in {path} or in {path / '0'}"
-    )
+    if not (is_raw or is_epochs):
+        raise FileNotFoundError(
+            f"Expected at least one of -raw.fif or -epo.fif in {path} or "
+            f"in {path / '0'} but found neither."
+        )
 
     datasets = []
     for path in paths:
@@ -130,26 +172,32 @@ def _load_signals_and_description(path, preload, is_raw, ids_to_load=None):
 
 
 def _load_signals(fif_file, preload, is_raw):
-    # Reading the raw file from pickle if it has been save before.
-    # The pickle file only contain the raw object without the data.
+    # Reading the raw file from the binary cache if it has been saved before.
+    # The cache file only contains the raw object without the data.
     pkl_file = fif_file.with_suffix(".pkl")
-    if pkl_file.exists():
+    cache_disabled = _pickle_cache_disabled()
+
+    if pkl_file.exists() and not cache_disabled:
+        _warn_pickle_cache_load(pkl_file)
         with open(pkl_file, "rb") as f:
-            signals = pickle.load(f)
+            # Documented unsafe surface: only load caches you produced.
+            # ``bandit`` suppression mirrors ``SECURITY.md`` §1.
+            signals = pickle.load(f)  # noqa: S301
 
         if all(Path(f).exists() for f in signals.filenames):
             if preload:
                 signals.load_data()
             return signals
-        else:  # This may happen if the file has been moved together with the pickle file.
+        else:  # This may happen if the file has been moved together with the cache.
             warnings.warn(
-                f"Pickle file {pkl_file} exists, but the referenced fif "
+                f"Cache file {pkl_file} exists, but the referenced fif "
                 "file(s) do not exist. Will read the fif file(s) directly "
-                "and re-create the pickle file.",
+                "and re-create the cache file.",
                 UserWarning,
             )
 
-    # If pickle didn't exist read via mne (likely slower) and save pkl after
+    # If the cache didn't exist (or is disabled) read via mne (likely slower)
+    # and save the cache after.
     if is_raw:
         signals = mne.io.read_raw_fif(fif_file, preload=preload)
     elif fif_file.name.endswith("-epo.fif"):
@@ -157,16 +205,17 @@ def _load_signals(fif_file, preload, is_raw):
     else:
         raise ValueError("fif_file must end with raw.fif or epo.fif.")
 
-    # Only do this for raw objects. Epoch objects are not picklable as they
-    # hold references to open files in `signals._raw[0].fid`.
-    if is_raw:
-        # Saving the raw file without data into a pickle file, so it can be
+    # Only do this for raw objects. Epoch objects are not serializable as they
+    # hold references to open files in `signals._raw[0].fid`. Also skip
+    # writing the cache when the user has opted out via the env var.
+    if is_raw and not cache_disabled:
+        # Saving the raw file without data into the cache, so it can be
         # retrieved faster on the next use of this dataset.
         with open(pkl_file, "wb") as f:
             if preload:
                 data = signals._data
                 signals._data, signals.preload = None, False
-            pickle.dump(signals, f)
+            pickle.dump(signals, f)  # noqa: S301
             if preload:
                 signals._data, signals.preload = data, True
 
