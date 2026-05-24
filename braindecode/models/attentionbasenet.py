@@ -687,7 +687,10 @@ def get_attention_block(
     elif attention_mode == "gsop":
         return GSoP(in_channels=ch_dim, reduction_rate=reduction_rate)
     elif attention_mode == "fca":
-        assert seq_len is not None
+        if seq_len is None:
+            raise ValueError(
+                "attention_mode='fca' requires seq_len to be set."
+            )
         return FCA(
             in_channels=ch_dim,
             seq_len=seq_len,
@@ -701,7 +704,10 @@ def get_attention_block(
         return ECA(in_channels=ch_dim, kernel_size=kernel_size)
     # improving the squeeze and the excitation module
     elif attention_mode == "ge":
-        assert seq_len is not None
+        if seq_len is None:
+            raise ValueError(
+                "attention_mode='ge' requires seq_len to be set."
+            )
         return GatherExcite(
             in_channels=ch_dim,
             seq_len=seq_len,

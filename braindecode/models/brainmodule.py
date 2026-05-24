@@ -326,7 +326,11 @@ class BrainModule(EEGModuleMixin, nn.Module):
             input_channels += subject_dim
 
         if subject_layers:
-            assert subject_dim > 0, "subject_layers requires subject_dim > 0"
+            if subject_dim <= 0:
+                raise ValueError(
+                    "subject_layers requires subject_dim > 0; "
+                    f"got subject_dim={subject_dim}."
+                )
             # Use n_chans for input dim since subject_layers is applied before
             # subject embeddings are concatenated in forward()
             meg_dim = self.n_chans
@@ -417,7 +421,12 @@ class BrainModule(EEGModuleMixin, nn.Module):
         # Apply STFT if enabled
         if self.stft is not None:
             # Pad for STFT window
-            assert self.n_fft is not None, "n_fft must be set if stft is not None"
+            if self.n_fft is None:  # pragma: no cover
+                raise RuntimeError(
+                    "BrainModule was constructed with an STFT layer but "
+                    "n_fft is None. This indicates inconsistent constructor "
+                    "state; rebuild the model with a valid ``n_fft``."
+                )
             pad_size = self.n_fft // 4
             x = F.pad(
                 _pad_multiple(x, self.n_fft // 2), (pad_size, pad_size), mode="reflect"
@@ -515,9 +524,10 @@ class _ConvSequence(nn.Module):
     ) -> None:
         super().__init__()
 
-        if dilation_growth > 1:
-            assert kernel_size % 2 != 0, (
-                "Supports only odd kernel with dilation for now"
+        if dilation_growth > 1 and kernel_size % 2 == 0:
+            raise ValueError(
+                "Only odd ``kernel_size`` is supported when ``dilation_growth > 1``; "
+                f"got kernel_size={kernel_size}, dilation_growth={dilation_growth}."
             )
 
         if activation is None:
