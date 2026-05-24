@@ -4,10 +4,12 @@
 # License: BSD (3-clause)
 
 
+from __future__ import annotations
+
 import abc
 import inspect
 import logging
-from typing import Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import mne
 import numpy as np
@@ -26,11 +28,20 @@ from .training.scoring import (
     PostEpochTrainScoring,
 )
 
+if TYPE_CHECKING:
+    from torch import nn
+
 log = logging.getLogger(__name__)
 
 
-def _get_model(model: str):
-    """Returns the corresponding class in case the model passed is a string."""
+def _get_model(model: str | type["nn.Module"]) -> type["nn.Module"]:
+    """Resolve a Braindecode model alias to its class.
+
+    ``model`` may be either a model name listed in
+    :data:`braindecode.models.util.models_dict` or an already-resolved
+    ``torch.nn.Module`` subclass. Returns the class unchanged in the
+    latter case, raises ``ValueError`` for unknown names.
+    """
     if isinstance(model, str):
         if model in models_dict:
             model = models_dict[model]
@@ -43,10 +54,10 @@ class _EEGNeuralNet(NeuralNet, abc.ABC):
     signal_args_set_ = False
 
     @property
-    def log(self):
+    def log(self) -> logging.Logger:
         return log.getChild(self.__class__.__name__)
 
-    def initialize_module(self):
+    def initialize_module(self) -> "_EEGNeuralNet":
         """Initializes the module.
 
         A Braindecode model name can also be passed as module argument.
@@ -73,10 +84,15 @@ class _EEGNeuralNet(NeuralNet, abc.ABC):
             else:
                 yield name, cb, named_by_user
 
-    def _parse_str_callback(self, cb_supplied_name):
+    def _parse_str_callback(self, cb_supplied_name: str) -> list[tuple[str, Any, bool]]:
         scoring = get_scorer(cb_supplied_name)
         scoring_name = scoring._score_func.__name__
-        assert scoring_name.endswith(("_score", "_error", "_deviance", "_loss"))
+        if not scoring_name.endswith(("_score", "_error", "_deviance", "_loss")):
+            raise ValueError(
+                f"Unsupported sklearn scoring function name {scoring_name!r}. "
+                "Expected a name ending in one of "
+                "'_score' / '_error' / '_deviance' / '_loss'."
+            )
         if scoring_name.endswith("_score") or cb_supplied_name.startswith("neg_"):
             lower_is_better = False
         else:
@@ -121,12 +137,18 @@ class _EEGNeuralNet(NeuralNet, abc.ABC):
             # for trialwise decoding stuffs it might also be we don't have
             # cropped loader, so no indices there
             if len(epoch_cbs) > 0:
-                assert self._last_window_inds_ is not None
+                if self._last_window_inds_ is None:  # pragma: no cover
+                    raise RuntimeError(
+                        "on_batch_end was reached for a cropped scoring "
+                        "callback but no window indices were captured on "
+                        "the preceding batch. Make sure get_iterator was "
+                        "called with drop_index=False."
+                    )
                 for cb in epoch_cbs:
                     cb.window_inds_.append(self._last_window_inds_)
                 self._last_window_inds_ = None
 
-    def predict_with_window_inds_and_ys(self, dataset):
+    def predict_with_window_inds_and_ys(self, dataset: Any) -> dict[str, np.ndarray]:
         self.module.eval()
         preds = []
         i_window_in_trials = []
@@ -228,7 +250,7 @@ class _EEGNeuralNet(NeuralNet, abc.ABC):
         module_kwargs = {f"module__{k}": v for k, v in module_kwargs.items()}
         self.set_params(**module_kwargs)
 
-    def get_dataset(self, X, y=None):
+    def get_dataset(self, X: Any, y: Any = None) -> Any:
         """Get a dataset that contains the input data and is passed to.
 
         the iterator.
@@ -267,7 +289,13 @@ class _EEGNeuralNet(NeuralNet, abc.ABC):
             X = X.get_data(units="uV")
         return super().get_dataset(X, y)
 
-    def partial_fit(self, X, y=None, classes=None, **fit_params):
+    def partial_fit(
+        self,
+        X: Any,
+        y: Any = None,
+        classes: Any = None,
+        **fit_params: Any,
+    ) -> "_EEGNeuralNet":
         """Fit the module.
 
         If the module is initialized, it is not re-initialized, which
@@ -321,7 +349,7 @@ class _EEGNeuralNet(NeuralNet, abc.ABC):
             self.signal_args_set_ = True
         return super().partial_fit(X=X, y=y, classes=classes, **fit_params)
 
-    def fit(self, X, y=None, **fit_params):
+    def fit(self, X: Any, y: Any = None, **fit_params: Any) -> "_EEGNeuralNet":
         """Initialize and fit the module.
 
         If the module was already initialized, by calling fit, the
