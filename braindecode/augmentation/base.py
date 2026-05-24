@@ -53,15 +53,23 @@ class Transform(torch.nn.Module):
 
     def __init__(self, probability=1.0, random_state=None):
         super().__init__()
-        if self.forward.__func__ is Transform.forward:
-            assert callable(self.operation), "operation should be a ``callable``. "
+        if self.forward.__func__ is Transform.forward and not callable(
+            self.operation
+        ):
+            raise TypeError(
+                "When using the default ``forward``, ``operation`` must be "
+                f"a callable; got {type(self.operation).__name__}."
+            )
 
-        assert isinstance(probability, Real), (
-            f"probability should be a ``real``. Got {type(probability)}."
-        )
-        assert probability <= 1.0 and probability >= 0.0, (
-            "probability should be between 0 and 1."
-        )
+        if not isinstance(probability, Real):
+            raise TypeError(
+                "probability must be a real number; "
+                f"got {type(probability).__name__}."
+            )
+        if not (0.0 <= probability <= 1.0):
+            raise ValueError(
+                f"probability must be in [0, 1]; got {probability}."
+            )
         self._probability = probability
         self.rng = check_random_state(random_state)
 

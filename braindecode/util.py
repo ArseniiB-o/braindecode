@@ -197,7 +197,11 @@ def wrap_reshape_apply_fn(stat_fn, a, b, axis_a, axis_b):
     flat_topo_b = transposed_topo_b.reshape(
         np.prod(n_other_axis_b), np.prod(n_stat_axis_b)
     )
-    assert np.array_equal(n_stat_axis_a, n_stat_axis_b)
+    if not np.array_equal(n_stat_axis_a, n_stat_axis_b):
+        raise ValueError(
+            "Topographic statistic axes must have identical shapes between "
+            f"inputs; got {tuple(n_stat_axis_a)} vs {tuple(n_stat_axis_b)}."
+        )
     stat_result = stat_fn(flat_topo_a, flat_topo_b)
     topo_result = stat_result.reshape(tuple(n_other_axis_a) + tuple(n_other_axis_b))
     return topo_result
@@ -226,7 +230,10 @@ def get_balanced_batches(n_trials, rng, shuffle, n_batches=None, batch_size=None
     batches : list of list of int
         Indices for each batch.
     """
-    assert batch_size is not None or n_batches is not None
+    if batch_size is None and n_batches is None:
+        raise ValueError(
+            "Either ``batch_size`` or ``n_batches`` must be provided."
+        )
     if n_batches is None:
         n_batches = int(np.round(n_trials / float(batch_size)))
 
@@ -237,7 +244,14 @@ def get_balanced_batches(n_trials, rng, shuffle, n_batches=None, batch_size=None
         n_batches = 1
         min_batch_size = n_trials
         n_batches_with_extra_trial = 0
-    assert n_batches_with_extra_trial < n_batches
+    # Defensive invariant: the integer division above guarantees this,
+    # but check explicitly so the failure mode is clear in debug runs.
+    if not (n_batches_with_extra_trial < n_batches):  # pragma: no cover
+        raise AssertionError(
+            "get_balanced_batches internal invariant violated: "
+            f"n_batches_with_extra_trial={n_batches_with_extra_trial} >= "
+            f"n_batches={n_batches}."
+        )
     all_inds = np.array(range(n_trials))
     if shuffle:
         rng.shuffle(all_inds)
@@ -251,7 +265,12 @@ def get_balanced_batches(n_trials, rng, shuffle, n_batches=None, batch_size=None
         batch_inds = all_inds[range(i_start_trial, i_stop_trial)]
         batches.append(batch_inds)
         i_start_trial = i_stop_trial
-    assert i_start_trial == n_trials
+    if i_start_trial != n_trials:  # pragma: no cover
+        raise AssertionError(
+            "get_balanced_batches internal invariant violated: "
+            f"i_start_trial={i_start_trial} != n_trials={n_trials} "
+            "after batching loop."
+        )
     return batches
 
 
@@ -441,9 +460,15 @@ def read_all_file_names(directory, extension):
     file_paths : list(str)
         List of all files found in (sub)directories of path.
     """
-    assert extension.startswith(".")
+    if not extension.startswith("."):
+        raise ValueError(
+            "extension must start with a leading dot (e.g. '.edf'); "
+            f"got {extension!r}."
+        )
     file_paths = glob.glob(directory + "**/*" + extension, recursive=True)
-    assert len(file_paths) > 0, (
-        f"something went wrong. Found no {extension} files in {directory}"
-    )
+    if not file_paths:
+        raise FileNotFoundError(
+            f"Found no {extension} files under {directory!r}. Check the "
+            "directory path and that the extension is correct."
+        )
     return file_paths

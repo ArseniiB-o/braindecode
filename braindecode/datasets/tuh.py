@@ -81,9 +81,10 @@ class TUH(BaseConcatDataset):
                 "on_missing_files must be either 'warn' or 'raise', "
                 f"got {on_missing_files}."
             )
-        if set_montage:
-            assert rename_channels, (
-                "If set_montage is True, rename_channels must be True."
+        if set_montage and not rename_channels:
+            raise ValueError(
+                "When ``set_montage=True``, ``rename_channels`` must also be "
+                "True so the renamed channels match the montage layout."
             )
         # create an index of all files and gather easily accessible info
         # without actually touching the files
@@ -427,7 +428,13 @@ def _read_physician_report(file_path):
     directory = os.path.dirname(file_path)
     txt_file = glob.glob(os.path.join(directory, "**/*.txt"), recursive=True)
     # check that there is at most one txt file in the same directory
-    assert len(txt_file) in [0, 1]
+    if len(txt_file) not in (0, 1):
+        raise RuntimeError(
+            f"Expected at most one .txt physician-report file in {directory}, "
+            f"but found {len(txt_file)}: {txt_file}. The TUH corpus stores "
+            "one report per session — multiple files indicate an unexpected "
+            "directory layout."
+        )
     report = ""
     if txt_file:
         txt_file = txt_file[0]
@@ -547,10 +554,17 @@ class TUHAbnormal(TUH):
         #                     reference/subset/subject/recording session/file
         # e.g.            v2.0.0/edf/train/normal/01_tcp_ar/000/00000021/
         #                     s004_2013_08_15/00000021_s004_t000.edf
-        assert "abnormal" in tokens or "normal" in tokens, "No pathology labels found."
-        assert "train" in tokens or "eval" in tokens, (
-            "No train or eval set information found."
-        )
+        if not ("abnormal" in tokens or "normal" in tokens):
+            raise ValueError(
+                "No pathology label (expected one of 'abnormal' / 'normal') "
+                f"found in path segments of {file_path!r}. The TUH dataset "
+                "layout has changed or the file is from a different corpus."
+            )
+        if not ("train" in tokens or "eval" in tokens):
+            raise ValueError(
+                "No train/eval split marker (expected one of 'train' / "
+                f"'eval') found in path segments of {file_path!r}."
+            )
         return {
             "version": tokens[-9],
             "train": "train" in tokens,
@@ -737,7 +751,12 @@ class TUHEvents(TUH):
             onsets, durations, descriptions = zip(*unique_events)  # type: ignore[assignment]
         # merge consecutive events
         if merge_events:
-            assert not channel_events
+            if channel_events:
+                raise ValueError(
+                    "merge_events=True is only supported when "
+                    "channel_events=False; per-channel events have no "
+                    "well-defined merge semantics across channels."
+                )
             merged_onsets: list[float] = []
             merged_durations: list[float] = []
             merged_descriptions: list[str] = []

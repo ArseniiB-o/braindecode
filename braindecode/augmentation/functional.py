@@ -170,12 +170,16 @@ def ft_surrogate(
        Problems of Noisy Signals by using Fourier Transform Surrogates. arXiv
        preprint arXiv:1806.08675.
     """
-    assert (
+    if not (
         isinstance(
             phase_noise_magnitude, (Real, torch.FloatTensor, torch.cuda.FloatTensor)
         )
         and 0 <= phase_noise_magnitude <= 1
-    ), f"eps must be a float between 0 and 1. Got {phase_noise_magnitude}."
+    ):
+        raise ValueError(
+            "phase_noise_magnitude must be a float (or 0-D float tensor) in "
+            f"[0, 1]; got {phase_noise_magnitude!r}."
+        )
 
     f = fft(X.double(), dim=-1)
     device = X.device
@@ -859,8 +863,20 @@ def _torch_make_interpolation_matrix(
     cosang_to_from = torch.matmul(pos_to, pos_from.T)
     G_from = _torch_calc_g(cosang_from)
     G_to_from = _torch_calc_g(cosang_to_from)
-    assert G_from.shape == (n_from, n_from)
-    assert G_to_from.shape == (n_to, n_from)
+    # Defensive internal-shape checks; the calls above derive shapes from
+    # the same ``pos_from`` / ``pos_to`` tensors, so a mismatch here would
+    # signal a bug in _torch_calc_g rather than user input. Raise instead
+    # of assert so the failure mode survives ``python -O``.
+    if G_from.shape != (n_from, n_from):  # pragma: no cover
+        raise AssertionError(
+            f"_torch_calc_g returned shape {tuple(G_from.shape)}, "
+            f"expected {(n_from, n_from)}."
+        )
+    if G_to_from.shape != (n_to, n_from):  # pragma: no cover
+        raise AssertionError(
+            f"_torch_calc_g returned shape {tuple(G_to_from.shape)}, "
+            f"expected {(n_to, n_from)}."
+        )
 
     if alpha is not None:
         G_from.flatten()[:: len(G_from) + 1] += alpha
@@ -888,7 +904,11 @@ def _torch_make_interpolation_matrix(
     interpolation = torch.hstack(
         [G_to_from, torch.ones((n_to, 1), device=device)]
     ).matmul(C_inv[:, :-1])
-    assert interpolation.shape == (n_to, n_from)
+    if interpolation.shape != (n_to, n_from):  # pragma: no cover
+        raise AssertionError(
+            "spherical_splines interpolation matrix has shape "
+            f"{tuple(interpolation.shape)}, expected {(n_to, n_from)}."
+        )
     return interpolation
 
 
@@ -933,7 +953,10 @@ def _make_rotation_matrix(
     angle: float | int | np.ndarray | list | torch.Tensor,
     degrees: bool = True,
 ) -> torch.Tensor:
-    assert axis in ["x", "y", "z"], "axis should be either x, y or z."
+    if axis not in ("x", "y", "z"):
+        raise ValueError(
+            f"axis must be one of 'x', 'y', 'z'; got {axis!r}."
+        )
     if isinstance(angle, torch.Tensor):
         _angle = angle
     elif isinstance(angle, (float, int, np.ndarray, list)):

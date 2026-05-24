@@ -475,10 +475,12 @@ class RecordDataset(Dataset[tuple[np.ndarray, int | str, tuple[int, int, int]]])
             for key, value in description.items():
                 # if the key is already in the existing description, drop it
                 if key in self._description:
-                    assert overwrite, (
-                        f"'{key}' already in description. Please "
-                        f"rename or set overwrite to True."
-                    )
+                    if not overwrite:
+                        raise ValueError(
+                            f"'{key}' is already present in the description. "
+                            "Pass ``overwrite=True`` or rename the column "
+                            "before merging."
+                        )
                     self._description.pop(key)
             self._description = pd.concat([self.description, description])
 
@@ -625,9 +627,19 @@ class RawDataset(_ZarrMixin, RecordDataset):
             if isinstance(target_name, tuple):
                 target_name = [name for name in target_name]
             elif not isinstance(target_name, list):
-                assert isinstance(target_name, str)
+                if not isinstance(target_name, str):
+                    raise TypeError(
+                        "target_name must be a str, tuple, list or None; "
+                        f"got {type(target_name).__name__}."
+                    )
                 target_name = [target_name]
-            assert isinstance(target_name, list)
+            # By construction the value is a list at this point; the runtime
+            # check survives ``python -O`` for defence in depth.
+            if not isinstance(target_name, list):  # pragma: no cover
+                raise AssertionError(
+                    "Internal: target_name normalisation produced a "
+                    f"{type(target_name).__name__} instead of list."
+                )
             # check if target name(s) can be read from description
             for name in target_name:
                 if self.description is None or name not in self.description:
@@ -946,7 +958,14 @@ class WindowsDataset(_ZarrMixin, RecordDataset):
         self.targets_from = targets_from
 
         metadata = self.windows.metadata
-        assert metadata is not None, "WindowsDataset requires windows with metadata."
+        if metadata is None:
+            raise ValueError(
+                "WindowsDataset requires an mne.Epochs object with "
+                "metadata (epochs.metadata is None). Use "
+                "``create_windows_from_events`` / "
+                "``create_fixed_length_windows`` to produce windows with "
+                "the expected metadata columns."
+            )
         self.metadata = metadata
         self.crop_inds = metadata.loc[
             :, ["i_window_in_trial", "i_start_in_trial", "i_stop_in_trial"]

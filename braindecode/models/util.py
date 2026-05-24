@@ -2,6 +2,8 @@
 #          Hubert Banville <hubert.jbanville@gmail.com>
 #
 # License: BSD (3-clause)
+from __future__ import annotations
+
 import inspect
 import warnings
 from copy import deepcopy
@@ -25,7 +27,7 @@ _EEG_PARAMS = frozenset(
 _JSON_SAFE = (int, float, str, bool, type(None))
 
 
-def _is_jsonable(val):
+def _is_jsonable(val: object) -> bool:
     """Return True if *val* is directly JSON-serializable."""
     if isinstance(val, _JSON_SAFE):
         return True
@@ -36,7 +38,7 @@ def _is_jsonable(val):
     return False
 
 
-def track_model_init_kwargs(cls) -> None:
+def track_model_init_kwargs(cls: type) -> None:
     """Instrument a model class so constructor kwargs are tracked."""
     init = cls.__init__
     if getattr(init, "_braindecode_tracks_init_kwargs", False):
@@ -108,7 +110,7 @@ def build_model_config(model) -> dict:
     return config
 
 
-def resolve_type_kwargs(cls, kwargs):
+def resolve_type_kwargs(cls: type, kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """Resolve type-encoded strings in *kwargs* back to Python types.
 
     When a model config is saved to JSON, ``type[nn.Module]`` parameters
@@ -147,7 +149,7 @@ def resolve_type_kwargs(cls, kwargs):
 # list.
 
 
-def _init_models_dict():
+def _init_models_dict() -> None:
     import braindecode.models as models
 
     for m in inspect.getmembers(models, inspect.isclass):
@@ -445,9 +447,21 @@ def _get_signal_params(
                 {"ch_name": f"C{i}", "kind": "eeg", "loc": _rng.random(12)}
                 for i in range(signal_params["n_chans"])
             ]
-        assert isinstance(sp["n_times"], int)
-        assert isinstance(sp["sfreq"], float)
-        assert isinstance(sp["input_window_seconds"], float)
+        if not isinstance(sp["n_times"], int):
+            raise TypeError(
+                "signal_params['n_times'] must be an int; "
+                f"got {type(sp['n_times']).__name__}."
+            )
+        if not isinstance(sp["sfreq"], float):
+            raise TypeError(
+                "signal_params['sfreq'] must be a float; "
+                f"got {type(sp['sfreq']).__name__}."
+            )
+        if not isinstance(sp["input_window_seconds"], float):
+            raise TypeError(
+                "signal_params['input_window_seconds'] must be a float; "
+                f"got {type(sp['input_window_seconds']).__name__}."
+            )
         if "input_window_seconds" not in signal_params:
             sp["input_window_seconds"] = sp["n_times"] / sp["sfreq"]
         if "sfreq" not in signal_params:
@@ -533,7 +547,7 @@ def _get_possible_signal_params(
 
 
 ################################################################
-def get_summary_table(dir_name=None):
+def get_summary_table(dir_name: Optional[Path | str] = None) -> pd.DataFrame:
     if dir_name is None:
         dir_path = Path(__file__).parent
     else:

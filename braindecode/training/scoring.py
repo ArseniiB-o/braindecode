@@ -38,9 +38,12 @@ def trial_preds_from_window_preds(preds, i_window_in_trials, i_stop_in_trials):
         Predictions in each trial, duplicates removed
 
     """
-    assert len(preds) == len(i_window_in_trials) == len(i_stop_in_trials), (
-        f"{len(preds)}, {len(i_window_in_trials)}, {len(i_stop_in_trials)}"
-    )
+    if not (len(preds) == len(i_window_in_trials) == len(i_stop_in_trials)):
+        raise ValueError(
+            "preds, i_window_in_trials and i_stop_in_trials must all have "
+            f"the same length; got {len(preds)}, "
+            f"{len(i_window_in_trials)}, {len(i_stop_in_trials)}."
+        )
 
     # Algorithm for assigning window predictions to trials
     # while removing duplicate predictions:
@@ -67,7 +70,12 @@ def trial_preds_from_window_preds(preds, i_window_in_trials, i_stop_in_trials):
     ):
         window_preds = np.array(window_preds)
         if i_window != (i_last_window + 1):
-            assert i_window == 0, "window numbers in new trial should start from 0"
+            if i_window != 0:
+                raise ValueError(
+                    "Detected start of a new trial but its first window "
+                    f"index is {i_window}, expected 0. The input "
+                    "`i_window_in_trials` may be misaligned."
+                )
             preds_per_trial.append(np.concatenate(cur_trial_preds, axis=1))
             cur_trial_preds = []
             i_last_stop = None
@@ -157,7 +165,12 @@ class CroppedTrialEpochScoring(EpochScoring):
             self.y_preds_[-1] = self.y_preds_[-1].cpu()
 
     def on_epoch_end(self, net, dataset_train, dataset_valid, **kwargs):
-        assert self.use_caching
+        if not self.use_caching:
+            raise RuntimeError(
+                "CroppedTrialEpochScoring requires use_caching=True; "
+                "trial-level scoring relies on the cached per-window "
+                "predictions from on_batch_end."
+            )
         if not self.crops_to_trials_computed:
             if self.on_train:
                 # Prevent that rng state of torch is changed by
@@ -234,7 +247,12 @@ class CroppedTimeSeriesEpochScoring(CroppedTrialEpochScoring):
     """
 
     def on_epoch_end(self, net, dataset_train, dataset_valid, **kwargs):
-        assert self.use_caching
+        if not self.use_caching:
+            raise RuntimeError(
+                "CroppedTrialEpochScoring requires use_caching=True; "
+                "trial-level scoring relies on the cached per-window "
+                "predictions from on_batch_end."
+            )
         if not self.crops_to_trials_computed:
             if self.on_train:
                 # Prevent that rng state of torch is changed by
