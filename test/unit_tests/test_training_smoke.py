@@ -24,7 +24,7 @@ import pytest
 import torch
 from torch import nn
 
-from braindecode import EEGClassifier
+from braindecode import EEGClassifier, EEGRegressor
 from braindecode.models import EEGNetv4
 
 
@@ -89,3 +89,36 @@ def test_eegclassifier_predict_proba_shape(synthetic_dataset):
     clf.fit(X, y)
     proba = clf.predict_proba(X)
     assert proba.shape == (X.shape[0], 2)
+
+
+def test_eegregressor_fit_returns_self(synthetic_dataset):
+    """``EEGRegressor.fit`` must return ``self`` for sklearn-compatibility.
+
+    Regression test for a bug where ``EEGRegressor.fit`` discarded the
+    return value of ``super().fit(...)``, so the method returned
+    ``None``. That broke any ``sklearn.pipeline.Pipeline`` /
+    ``GridSearchCV`` flow that chains ``.fit(...).predict(...)`` or
+    relies on the standard estimator contract.
+    """
+    X, _ = synthetic_dataset
+    # Regression targets: random floats, one per sample.
+    y = np.random.default_rng(0).standard_normal(size=X.shape[0]).astype(np.float32)
+
+    reg = EEGRegressor(
+        module=EEGNetv4,
+        module__n_chans=X.shape[1],
+        module__n_outputs=1,
+        module__n_times=X.shape[2],
+        module__sfreq=128.0,
+        criterion=nn.MSELoss,
+        optimizer=torch.optim.Adam,
+        train_split=None,
+        max_epochs=1,
+        batch_size=8,
+        verbose=0,
+        device="cpu",
+    )
+    returned = reg.fit(X, y)
+    assert returned is reg, (
+        "EEGRegressor.fit must return self (sklearn estimator contract)."
+    )
