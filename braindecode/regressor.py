@@ -195,7 +195,7 @@ class EEGRegressor(_EEGNeuralNet, NeuralNetRegressor):
             num_workers=self.get_iterator(X, training=False).loader.num_workers,
         )
 
-    def fit(self, X: Any, y: Any = None, **kwargs: Any) -> Any:
+    def fit(self, X: Any, y: Any = None, **kwargs: Any) -> "EEGRegressor":
         """Initialize and fit the module.
 
         If the module was already initialized, by calling fit, the
@@ -242,7 +242,12 @@ class EEGRegressor(_EEGNeuralNet, NeuralNetRegressor):
         if y is not None:
             if y.ndim == 1:
                 y = np.array(y).reshape(-1, 1)
+        # Return ``self`` so the method respects the sklearn ``BaseEstimator``
+        # / skorch ``NeuralNet`` contract that ``fit`` returns the estimator.
+        # Without this, ``Pipeline`` and ``GridSearchCV`` silently break
+        # because they expect the fitted estimator back from each step.
         super().fit(X=X, y=y, **kwargs)
+        return self
 
     @property
     def mode(self) -> str:
