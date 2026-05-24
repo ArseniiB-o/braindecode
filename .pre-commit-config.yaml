@@ -141,6 +141,19 @@ repos:
         files: ^braindecode/
         stages: [manual]
 
+      # Regression gate for the assert → typed-exception migration:
+      # the source tree must not grow new ``assert`` statements past the
+      # current baseline. Run on demand with
+      # ``pre-commit run --hook-stage manual assert-budget``; CI can pin
+      # the threshold once the migration stabilises by removing the
+      # ``stages: [manual]`` line.
+      - id: assert-budget
+        name: assert-budget (manual)
+        entry: python scripts/report_asserts.py --threshold 41
+        language: system
+        pass_filenames: false
+        stages: [manual]
+
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.19.1
     hooks:
